@@ -1,0 +1,4 @@
+cql-migrate
+-----------
+
+This tool can perform automatic schema upgrades on a Cassandra database.
