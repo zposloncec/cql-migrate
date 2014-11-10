@@ -3,7 +3,7 @@
 from sys import stdin
 from argparse import ArgumentParser
 
-from cqlmigrate import splitCql
+from cqlmigrate import splitCql, CqlshExecutor
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='Migrate CQL Schemas')
@@ -12,8 +12,14 @@ if __name__ == '__main__':
     parser.add_argument('port', default=9160, type=int, nargs='?')
     args = parser.parse_args()
     print "Deploying to %s:%s" % (args.host, args.port)
+    executor = CqlshExecutor(args.host, args.port)
     cql = args.file.read()
     chunks = splitCql(cql)
     print "Found %d chunks of CQL" % len(chunks)
-    
+    for c in chunks:
+        print "----------------------"
+        print c.body()
+        a = executor.execute(c.body())
+        print "==> %d" % a
+
 # vim: set expandtab tabstop=4 shiftwidth=4:

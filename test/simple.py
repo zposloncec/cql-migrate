@@ -1,12 +1,18 @@
 #! /usr/bin/env python
 
-import unittest
-from unittest import TestCase
-from os.path import join, dirname, normpath
 from os import walk
-import re
+from os.path import join, dirname, normpath
+from time import sleep
+from unittest import TestCase, expectedFailure
 
+import re
+import subprocess
+import unittest
+
+from cqlmigrate.executor import RAN_OK, NO_CHANGE
 import cqlmigrate
+import cqlmigrate.executor
+
 
 simple = """
 CREATE TABLE IF NOT EXISTS auth_plus.clients (
@@ -83,6 +89,63 @@ class SplitCQL(TestCase):
     def testKeyspace(self):
         res = cqlmigrate.splitCql(keyspace)
         self.assertEquals(len(res), 2)
+
+class ClassifyOutputOfCqlsh(TestCase):
+    def testDuplicateCreate(self):
+        err = "<stdin>:4:Bad Request: Cannot add already existing column family \"aaa\" to keyspace \"phil\""
+        self.assertEquals(cqlmigrate.executor.NO_CHANGE, cqlmigrate.executor.classify('',err, 0))
+    def testDuplicateAlter(self):
+        err = "<stdin>:2:Bad Request: Invalid column name aaa because it conflicts with an existing column\n"
+        self.assertEquals(cqlmigrate.executor.NO_CHANGE, cqlmigrate.executor.classify('',err, 0))
+    def testBadCql(self):
+        err = "<stdin>:2:Incomplete statement at end of file"
+        self.assertRaises(cqlmigrate.executor.CqlExecutionFailed, cqlmigrate.executor.classify, '', err, 0)
+
+
+def runcqlsh(cmd):
+    proc = subprocess.Popen(['cqlsh'], # TODO: get this from env, or cmdline
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    (out,err) = proc.communicate(cmd)
+    sleep(2) # Wait for schema to get to all nodes
+    return out + err
+
+
+class DataNotOverwritten(TestCase):
+    def setUp(self):
+        init = """
+        DROP KEYSPACE IF EXISTS DataNotOverwritten;
+        CREATE KEYSPACE IF NOT EXISTS DataNotOverwritten
+        WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 2};
+        CREATE TABLE DataNotOverwritten.tt (pk text, v int, PRIMARY KEY (pk));
+        """
+        # Create a temp keyspace/table
+        print runcqlsh(init)
+        self.executor = cqlmigrate.executor.CqlshExecutor('localhost', 9160)
+    def testAddColumn(self):
+        e = self.executor
+        # Load initial data
+        e.execute("UPDATE DataNotOverwritten.tt SET v = 4050 WHERE pk='bob';")
+        self.assertEquals(NO_CHANGE, e.execute("CREATE TABLE DataNotOverwritten.tt (pk text, v int, PRIMARY KEY (pk));"))
+        self.assertEquals(RAN_OK, e.execute("ALTER TABLE DataNotOverwritten.tt ADD newcol text;"))
+        # Can write to new column
+        e.execute("UPDATE DataNotOverwritten.tt SET newcol = 'newdata' WHERE pk='bob';")
+        # Trying to create the column again is a no-op
+        self.assertEquals(NO_CHANGE, e.execute("ALTER TABLE DataNotOverwritten.tt ADD newcol text;"))
+        # Both new and old data are present
+        r = runcqlsh("SELECT v, newcol from DataNotOverwritten.tt WHERE pk='bob';")
+        self.assertIn('4050', r)
+        self.assertIn('newdata', r)
+
+    @expectedFailure
+    def testStaticSamePk(self):
+        e = self.executor
+        # The first time through the static data should be written
+        e.execute("UPDATE DataNotOverwritten.tt SET v = 4050 WHERE pk='bob';")
+        self.assertIn('4050', runcqlsh("SELECT v from DataNotOverwritten.tt WHERE pk='bob';"))
+        # If data already exists for that primary key, the data shouldn't be written
+        e.execute("UPDATE DataNotOverwritten.tt SET v = 4051 WHERE pk='bob';")
+        self.assertIn('4050', runcqlsh("SELECT v from DataNotOverwritten.tt WHERE pk='bob';"))
+
 
 
 re_tab_nl = re.compile('[ \t]$', re.M)
