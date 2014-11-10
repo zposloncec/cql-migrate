@@ -2,7 +2,9 @@
 
 import unittest
 from unittest import TestCase
-from os.path import join, dirname
+from os.path import join, dirname, normpath
+from os import walk
+import re
 
 import cqlmigrate
 
@@ -82,7 +84,30 @@ class SplitCQL(TestCase):
         res = cqlmigrate.splitCql(keyspace)
         self.assertEquals(len(res), 2)
 
+
+re_tab_nl = re.compile('[ \t]$', re.M)
+
+class CodeStyle(TestCase):
+    """Check some code style issues, specifically trailing whilespace and
+    tabs rather than spaces """
+    def _checkfile(self, root, name):
+        if name.endswith('.py'):
+            path = join(root, name)
+            with open(path) as f:
+                contents = f.read()
+                self.assertFalse("\t" in contents, path + " contains a tab character")
+                m = re_tab_nl.search(contents)
+                lineno = -1
+                if m:
+                    lineno = len(contents[:m.start()].splitlines())
+                    self.fail(path + " contains trailing whitespace on line %d" % lineno)
+    def testNoTabs(self):
+        projroot = normpath(join(dirname(__file__), '..'))
+        for d in ['cqlmigrate', 'test']:
+            for root, dirs, files in walk(join(projroot,d)):
+                for name in files:
+                    self._checkfile(root, name)
+
 if __name__ == '__main__':
     unittest.main()
-
 # vim: set expandtab tabstop=4 shiftwidth=4:

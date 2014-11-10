@@ -48,7 +48,7 @@ alter.setParseAction(ParseActionSimple('ALTER'))
 
 
 # UPDATE ....
-update = (CaselessLiteral("UPDATE") + identifier + CaselessLiteral("SET") + identifier + '=' + literal + 
+update = (CaselessLiteral("UPDATE") + identifier + CaselessLiteral("SET") + identifier + '=' + literal +
         CaselessLiteral("WHERE") + identifier + '=' + literal + ';')
 
 class UpdateStatement(object):
