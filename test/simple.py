@@ -90,8 +90,7 @@ re_tab_nl = re.compile('[ \t]$', re.M)
 class CodeStyle(TestCase):
     """Check some code style issues, specifically trailing whilespace and
     tabs rather than spaces """
-    def _checkfile(self, root, name):
-        if name.endswith('.py'):
+    def _checkpythonfile(self, root, name):
             path = join(root, name)
             with open(path) as f:
                 contents = f.read()
@@ -106,7 +105,9 @@ class CodeStyle(TestCase):
         for d in ['cqlmigrate', 'test']:
             for root, dirs, files in walk(join(projroot,d)):
                 for name in files:
-                    self._checkfile(root, name)
+                    if name.endswith('.py'):
+                        self._checkpythonfile(root, name)
+        self._checkpythonfile(join(projroot,'bin'), 'cql-migrate')
 
 if __name__ == '__main__':
     unittest.main()
