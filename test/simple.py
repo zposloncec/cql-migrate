@@ -9,10 +9,8 @@ import re
 import subprocess
 import unittest
 
-from cqlmigrate.executor import RAN_OK, NO_CHANGE
-import cqlmigrate
-import cqlmigrate.executor
-
+# DUT
+from cqlmigrate import splitCql, CassandraExecutor, RAN_OK, NO_CHANGE
 
 simple = """
 CREATE TABLE IF NOT EXISTS auth_plus.clients (
@@ -66,17 +64,17 @@ alter table bar add ggg text;
 
 class SplitCQL(TestCase):
     def testCreateSplit(self):
-        res = cqlmigrate.splitCql(simple)
+        res = splitCql(simple)
         body = [x.body() for x in res]
         self.assertEquals(body, simple_res)
         self.assertEquals([x.is_update() for x in res], [False, False])
     def testAlterSplit(self):
-        res = cqlmigrate.splitCql(alter)
+        res = splitCql(alter)
         body = [x.body() for x in res]
         self.assertEquals(body, alter_res)
         self.assertEquals([x.is_update() for x in res], [False, False])
     def testUpdate(self):
-        res = cqlmigrate.splitCql(update)
+        res = splitCql(update)
         body = [x.body() for x in res]
         self.assertEquals(body, update_res)
         self.assertEquals([x.is_update() for x in res], [True, False])
@@ -87,27 +85,15 @@ class SplitCQL(TestCase):
         self.assertEquals(u.pkcol ,'name')
         self.assertEquals(u.pkvalue ,'bob')
     def testKeyspace(self):
-        res = cqlmigrate.splitCql(keyspace)
+        res = splitCql(keyspace)
         self.assertEquals(len(res), 2)
-
-class ClassifyOutputOfCqlsh(TestCase):
-    def testDuplicateCreate(self):
-        err = "<stdin>:4:Bad Request: Cannot add already existing column family \"aaa\" to keyspace \"phil\""
-        self.assertEquals(cqlmigrate.executor.NO_CHANGE, cqlmigrate.executor.classify('',err, 0))
-    def testDuplicateAlter(self):
-        err = "<stdin>:2:Bad Request: Invalid column name aaa because it conflicts with an existing column\n"
-        self.assertEquals(cqlmigrate.executor.NO_CHANGE, cqlmigrate.executor.classify('',err, 0))
-    def testBadCql(self):
-        err = "<stdin>:2:Incomplete statement at end of file"
-        self.assertRaises(cqlmigrate.executor.CqlExecutionFailed, cqlmigrate.executor.classify, '', err, 0)
-
 
 CASSANDRA_HOST = 'localhost'
 CASSANDRA_PORT = 9042
 
 class DataNotOverwritten(TestCase):
     def setUp(self):
-        self.executor = cqlmigrate.executor.CassandraExecutor(CASSANDRA_HOST, CASSANDRA_PORT)
+        self.executor = CassandraExecutor(CASSANDRA_HOST, CASSANDRA_PORT)
         init = """
         CREATE KEYSPACE IF NOT EXISTS DataNotOverwritten
         WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 2};
@@ -115,7 +101,7 @@ class DataNotOverwritten(TestCase):
         """
         # Create a temp keyspace/table
         self.executor.execute('DROP KEYSPACE IF EXISTS DataNotOverwritten;')
-        [self.executor.execute(i.body()) for i in cqlmigrate.splitCql(init)]
+        [self.executor.execute(i.body()) for i in splitCql(init)]
     def testAddColumn(self):
         e = self.executor
         # Load initial data

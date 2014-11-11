@@ -39,36 +39,4 @@ class CassandraExecutor(object):
                 raise CqlExecutionFailed(str(e))
     def select(self, query):
         return self.session.execute(query)
-
-
-
-def classify(out, err, returncode):
-    """Identify if the output cqlsh maps to either success, 'the table/column
-    already existed', or failure."""
-    if out == '' and err == '' and returncode == 0:
-        return RAN_OK
-    for substring, res in known_messages:
-        if substring in err:
-            return res
-    if err != '':
-        raise CqlExecutionFailed(err)
-    if returncode != 0:
-        raise CqlExecutionFailed("Non-Zero return code from cqlsh:%d" % returncode)
-    raise CqlExecutionFailed(out + err)
-
-
-
-class CqlshExecutor(object):
-    """Execute CQL by shelling out to cqlsh"""
-    def __init__(self, host, port):
-        self.host = host
-        self.port = port
-    def execute(self, chunk):
-        """Execute a chunk of CQL. returns one of RAN_OK ... UPDATED on
-        success, and throw an exception if there was an unexpected failure"""
-        proc = subprocess.Popen(['cqlsh', self.host, "%d" % self.port],
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        (out,err) = proc.communicate(chunk)
-        return classify(out,err, proc.returncode)
-
 # vim: set expandtab tabstop=4 shiftwidth=4:
