@@ -19,7 +19,7 @@ coldefn = pkey | (identifier + cqltype)
 ifnotexists = Optional(CaselessLiteral("IF") + CaselessLiteral("NOT") + CaselessLiteral("EXISTS"))
 
 literal = Forward()
-literal_string = QuotedString("'")
+literal_string = QuotedString("'", unquoteResults=False)
 
 map_kv = literal_string + ':' + literal
 literal_map = itemlist('{', map_kv, ',', '}')
@@ -52,6 +52,9 @@ update = (CaselessLiteral("UPDATE") + identifier + CaselessLiteral("SET") + iden
         CaselessLiteral("WHERE") + identifier + '=' + literal + ';')
 
 class UpdateStatement(object):
+    """Information about the an UPDATE statement. Note that pkvalue and value
+    are stored as strings that are suitable literals for CQL, so the string "fred" is
+    stored as "'fred'" and the integer 123 is stored as "123"."""
     def __init__(self, table, pkcol, pkvalue, col, value):
         self.table = table
         self.pkcol = pkcol

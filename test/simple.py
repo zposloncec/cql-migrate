@@ -81,9 +81,9 @@ class SplitCQL(TestCase):
         u = res[0].info
         self.assertEquals(u.table, 'tok')
         self.assertEquals(u.col, 'details')
-        self.assertEquals(u.value ,'asdf')
+        self.assertEquals(u.value ,"'asdf'")
         self.assertEquals(u.pkcol ,'name')
-        self.assertEquals(u.pkvalue ,'bob')
+        self.assertEquals(u.pkvalue ,"'bob'")
     def testKeyspace(self):
         res = splitCql(keyspace)
         self.assertEquals(len(res), 2)
@@ -100,32 +100,33 @@ class DataNotOverwritten(TestCase):
         CREATE TABLE DataNotOverwritten.tt (pk text, v int, PRIMARY KEY (pk));
         """
         # Create a temp keyspace/table
-        self.executor.execute('DROP KEYSPACE IF EXISTS DataNotOverwritten;')
-        [self.executor.execute(i.body()) for i in splitCql(init)]
+        self.executor.execute_raw('DROP KEYSPACE IF EXISTS DataNotOverwritten;')
+        [self.executor.execute_chunk(i) for i in splitCql(init)]
     def testAddColumn(self):
         e = self.executor
         # Load initial data
-        e.execute("UPDATE DataNotOverwritten.tt SET v = 4050 WHERE pk='bob';")
-        self.assertEquals(NO_CHANGE, e.execute("CREATE TABLE DataNotOverwritten.tt (pk text, v int, PRIMARY KEY (pk));"))
-        self.assertEquals(RAN_OK, e.execute("ALTER TABLE DataNotOverwritten.tt ADD newcol text;"))
+        e.execute_raw("UPDATE DataNotOverwritten.tt SET v = 4050 WHERE pk='bob';")
+        self.assertEquals(NO_CHANGE, e.execute_raw("CREATE TABLE DataNotOverwritten.tt (pk text, v int, PRIMARY KEY (pk));"))
+        self.assertEquals(RAN_OK, e.execute_raw("ALTER TABLE DataNotOverwritten.tt ADD newcol text;"))
         # Can write to new column
-        e.execute("UPDATE DataNotOverwritten.tt SET newcol = 'newdata' WHERE pk='bob';")
+        e.execute_raw("UPDATE DataNotOverwritten.tt SET newcol = 'newdata' WHERE pk='bob';")
         # Trying to create the column again is a no-op
-        self.assertEquals(NO_CHANGE, e.execute("ALTER TABLE DataNotOverwritten.tt ADD newcol text;"))
+        self.assertEquals(NO_CHANGE, e.execute_raw("ALTER TABLE DataNotOverwritten.tt ADD newcol text;"))
         # Both new and old data are present
         r = e.select("SELECT v, newcol from DataNotOverwritten.tt WHERE pk='bob';")
         self.assertEquals(4050, r[0].v)
         self.assertEquals('newdata', r[0].newcol)
 
-    @expectedFailure
     def testStaticSamePk(self):
         e = self.executor
         # The first time through the static data should be written
-        e.execute("UPDATE DataNotOverwritten.tt SET v = 4050 WHERE pk='bob';")
+        updated = [e.execute_chunk(c) for c in splitCql("UPDATE DataNotOverwritten.tt SET v = 4050 WHERE pk='bob';")]
         self.assertEquals(4050, e.select("SELECT v from DataNotOverwritten.tt WHERE pk='bob';")[0].v)
+        self.assertEquals([RAN_OK], updated)
         # If data already exists for that primary key, the data shouldn't be written
-        e.execute("UPDATE DataNotOverwritten.tt SET v = 4051 WHERE pk='bob';")
+        updated = [e.execute_chunk(c) for c in splitCql("UPDATE DataNotOverwritten.tt SET v = 4051 WHERE pk='bob';")]
         self.assertEquals(4050, e.select("SELECT v from DataNotOverwritten.tt WHERE pk='bob';")[0].v)
+        self.assertEquals([NO_CHANGE], updated)
 
 
 

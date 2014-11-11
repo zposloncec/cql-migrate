@@ -5,6 +5,9 @@ import subprocess
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra import AlreadyExists, InvalidRequest
 
+# Application imports
+from .split import CqlChunk, splitCql
+
 # Return codes for the Executor.execute method (in addition to throwing CqlExecutionFailed)
 RAN_OK = 0
 NO_CHANGE = 1
@@ -26,9 +29,19 @@ class CassandraExecutor(object):
     def __init__(self, host, port):
         cluster = Cluster([host], port)
         self.session = cluster.connect()
-    def execute(self, chunk):
+    def execute_chunk(self, chunk):
+        assert isinstance(chunk, CqlChunk)
+        if chunk.is_update():
+            i = chunk.info
+            query = "SELECT %s from %s WHERE %s=%s" % (i.col, i.table, i.pkcol, i.pkvalue)
+            res = self.select(query)
+            if len(res) > 0 and res[0][0] != None:
+                return NO_CHANGE
+        return self.execute_raw(chunk.body())
+
+    def execute_raw(self, cql):
         try:
-            self.session.execute(chunk)
+            self.session.execute(cql)
             return RAN_OK
         except AlreadyExists:
             return NO_CHANGE
