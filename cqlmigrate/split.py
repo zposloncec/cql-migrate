@@ -23,8 +23,11 @@ literal_string = QuotedString("'", unquoteResults=False)
 map_kv = literal_string + ':' + literal
 literal_map = itemlist('{', map_kv, ',', '}')
 
-literal_int = Word(nums)
-literal << (literal_string | literal_int | literal_map )
+literal_set = itemlist('{', literal, ',', '}')
+# Matches numbers and uuids
+literal_int_uuid = Word('0123456789abcdefABCEDEF-.')
+
+literal << (literal_string | literal_int_uuid | literal_set | literal_map)
 
 
 class ParseActionSimple(object):
@@ -47,8 +50,12 @@ alter.setParseAction(ParseActionSimple('ALTER'))
 
 
 # UPDATE ....
+update_where = Forward()
+update_constraint = identifier + '=' + literal;
+update_where << ((update_constraint + "AND" + update_where) | update_constraint)
+
 update = (CaselessLiteral("UPDATE") + identifier + CaselessLiteral("SET") + identifier + '=' + literal +
-        CaselessLiteral("WHERE") + identifier + '=' + literal + ';')
+        CaselessLiteral("WHERE") + update_where + ';')
 
 class UpdateStatement(object):
     """Information about the an UPDATE statement. Note that pkvalue and value

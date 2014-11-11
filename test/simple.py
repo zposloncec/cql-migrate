@@ -89,6 +89,12 @@ class SplitCQL(TestCase):
     def testSplitWithComments(self):
         r = splitCql("UPDATE DataNotOverwritten.tt SET v = 4052 WHERE pk='fred'; -- comment")
         self.assertEquals([False, True], [i.is_comment() for i in r])
+    def testParseUuid(self):
+        splitCql("UPDATE x SET y='z' WHERE a=59514bf0-0830-11e4-9191-0800200c9a66;")
+    def testParseSet(self):
+        splitCql("UPDATE x SET y={'a', 'b'} WHERE a=59514bf0-0830-11e4-9191-0800200c9a66;")
+    def testParseMultpleAnd(self):
+        splitCql("UPDATE x SET y='z' WHERE a='a' AND b='b';")
 
 
 CASSANDRA_HOST = 'localhost'
