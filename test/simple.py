@@ -102,25 +102,20 @@ class ClassifyOutputOfCqlsh(TestCase):
         self.assertRaises(cqlmigrate.executor.CqlExecutionFailed, cqlmigrate.executor.classify, '', err, 0)
 
 
-def runcqlsh(cmd):
-    proc = subprocess.Popen(['cqlsh'], # TODO: get this from env, or cmdline
-        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    (out,err) = proc.communicate(cmd)
-    sleep(2) # Wait for schema to get to all nodes
-    return out + err
-
+CASSANDRA_HOST = 'localhost'
+CASSANDRA_PORT = 9042
 
 class DataNotOverwritten(TestCase):
     def setUp(self):
+        self.executor = cqlmigrate.executor.CassandraExecutor(CASSANDRA_HOST, CASSANDRA_PORT)
         init = """
-        DROP KEYSPACE IF EXISTS DataNotOverwritten;
         CREATE KEYSPACE IF NOT EXISTS DataNotOverwritten
         WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 2};
         CREATE TABLE DataNotOverwritten.tt (pk text, v int, PRIMARY KEY (pk));
         """
         # Create a temp keyspace/table
-        print runcqlsh(init)
-        self.executor = cqlmigrate.executor.CqlshExecutor('localhost', 9160)
+        self.executor.execute('DROP KEYSPACE IF EXISTS DataNotOverwritten;')
+        [self.executor.execute(i.body()) for i in cqlmigrate.splitCql(init)]
     def testAddColumn(self):
         e = self.executor
         # Load initial data
@@ -132,19 +127,19 @@ class DataNotOverwritten(TestCase):
         # Trying to create the column again is a no-op
         self.assertEquals(NO_CHANGE, e.execute("ALTER TABLE DataNotOverwritten.tt ADD newcol text;"))
         # Both new and old data are present
-        r = runcqlsh("SELECT v, newcol from DataNotOverwritten.tt WHERE pk='bob';")
-        self.assertIn('4050', r)
-        self.assertIn('newdata', r)
+        r = e.select("SELECT v, newcol from DataNotOverwritten.tt WHERE pk='bob';")
+        self.assertEquals(4050, r[0].v)
+        self.assertEquals('newdata', r[0].newcol)
 
     @expectedFailure
     def testStaticSamePk(self):
         e = self.executor
         # The first time through the static data should be written
         e.execute("UPDATE DataNotOverwritten.tt SET v = 4050 WHERE pk='bob';")
-        self.assertIn('4050', runcqlsh("SELECT v from DataNotOverwritten.tt WHERE pk='bob';"))
+        self.assertEquals(4050, e.select("SELECT v from DataNotOverwritten.tt WHERE pk='bob';")[0].v)
         # If data already exists for that primary key, the data shouldn't be written
         e.execute("UPDATE DataNotOverwritten.tt SET v = 4051 WHERE pk='bob';")
-        self.assertIn('4050', runcqlsh("SELECT v from DataNotOverwritten.tt WHERE pk='bob';"))
+        self.assertEquals(4050, e.select("SELECT v from DataNotOverwritten.tt WHERE pk='bob';")[0].v)
 
 
 

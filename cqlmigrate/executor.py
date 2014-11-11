@@ -1,4 +1,9 @@
+# System imports
 import subprocess
+
+# Library imports
+from cassandra.cluster import Cluster, NoHostAvailable
+from cassandra import AlreadyExists, InvalidRequest
 
 # Return codes for the Executor.execute method (in addition to throwing CqlExecutionFailed)
 RAN_OK = 0
@@ -16,7 +21,30 @@ class CqlExecutionFailed(Exception):
         super(CqlExecutionFailed, self).__init__(msg)
 
 
+class CassandraExecutor(object):
+    """Execute CQL by calling the python-cassandra library"""
+    def __init__(self, host, port):
+        cluster = Cluster([host], port)
+        self.session = cluster.connect()
+    def execute(self, chunk):
+        try:
+            self.session.execute(chunk)
+            return RAN_OK
+        except AlreadyExists:
+            return NO_CHANGE
+        except InvalidRequest, e:
+            if 'code=2200' in str(e):
+                return NO_CHANGE
+            else:
+                raise CqlExecutionFailed(str(e))
+    def select(self, query):
+        return self.session.execute(query)
+
+
+
 def classify(out, err, returncode):
+    """Identify if the output cqlsh maps to either success, 'the table/column
+    already existed', or failure."""
     if out == '' and err == '' and returncode == 0:
         return RAN_OK
     for substring, res in known_messages:
@@ -31,6 +59,7 @@ def classify(out, err, returncode):
 
 
 class CqlshExecutor(object):
+    """Execute CQL by shelling out to cqlsh"""
     def __init__(self, host, port):
         self.host = host
         self.port = port
