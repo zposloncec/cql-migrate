@@ -13,7 +13,7 @@ from cqlmigrate import splitCql, CassandraExecutor, RAN_OK, NO_CHANGE
 
 simple = """
 CREATE TABLE IF NOT EXISTS auth_plus.clients (
-  client_id uuid, -- A comment
+  client_id uuid,
   description text,
   PRIMARY KEY (client_id)
 );
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS auth_plus.users (
 """
 
 simple_res = ["""CREATE TABLE IF NOT EXISTS auth_plus.clients (
-  client_id uuid, -- A comment
+  client_id uuid,
   description text,
   PRIMARY KEY (client_id)
 );""", """CREATE TABLE IF NOT EXISTS auth_plus.users (
@@ -86,6 +86,10 @@ class SplitCQL(TestCase):
     def testKeyspace(self):
         res = splitCql(keyspace)
         self.assertEquals(len(res), 2)
+    def testSplitWithComments(self):
+        r = splitCql("UPDATE DataNotOverwritten.tt SET v = 4052 WHERE pk='fred'; -- comment")
+        self.assertEquals([False, True], [i.is_comment() for i in r])
+
 
 CASSANDRA_HOST = 'localhost'
 CASSANDRA_PORT = 9042
@@ -132,6 +136,23 @@ class DataNotOverwritten(TestCase):
         self.assertEquals(4052, e.select("SELECT v from DataNotOverwritten.tt WHERE pk='fred';")[0].v)
         self.assertEquals([RAN_OK], updated)
 
+    def testComments(self):
+        e = self.executor
+        cql = """
+        CREATE TABLE IF NOT EXISTS DataNotOverwritten.atable (
+          client_id uuid,
+          username text,
+          PRIMARY KEY (client_id, username)
+        );
+
+        --
+        -- This is a comment
+        --
+
+        ALTER TABLE DataNotOverwritten.atable ADD description text;
+        """
+        for c in splitCql(cql):
+            e.execute_chunk(c)
 
 re_tab_nl = re.compile('[ \t]$', re.M)
 

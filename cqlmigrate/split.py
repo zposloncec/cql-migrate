@@ -2,7 +2,6 @@ from pyparsing import alphanums, nums, lineEnd, ParseResults
 from pyparsing import CaselessLiteral, Regex, Word, Forward, QuotedString
 from pyparsing import nestedExpr, Optional, OneOrMore
 
-comment = Regex('--[^\n]*') + lineEnd
 
 def itemlist(start, body, delimiter, end):
     a = Forward()
@@ -76,9 +75,18 @@ create_keyspace = (CaselessLiteral("CREATE") + CaselessLiteral("KEYSPACE") + ifn
 
 create_keyspace.setParseAction(ParseActionSimple('CREATE KEYSPACE'))
 
-cql = OneOrMore(ctable | alter | update | create_keyspace)
+# Comments
+# It would be nice to remove comments in the lexing stage, except that
+# they are not part of the language that cassandra understands: they are
+# part of cqlsh. Instead mark them as special chunks and skip them in
+# the executor. This means that comments may only appear between
+# statements.
+comment = Regex('--[^\n]*') + lineEnd
 
-cql.ignore(comment)
+comment.setParseAction(ParseActionSimple('COMMENT'))
+
+cql = OneOrMore(ctable | alter | update | create_keyspace | comment)
+
 cql.enablePackrat()
 cql.parseWithTabs()
 
@@ -94,6 +102,8 @@ class CqlChunk(object):
         return self.src[self.start:self.end].strip()
     def is_update(self):
         return self.chunk_type == 'UPDATE'
+    def is_comment(self):
+        return self.chunk_type == 'COMMENT'
 
 def splitCql(s):
     chunk_breaks = cql.parseString(s, parseAll=True)

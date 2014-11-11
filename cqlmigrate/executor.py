@@ -31,9 +31,11 @@ class CassandraExecutor(object):
         self.session = cluster.connect()
     def execute_chunk(self, chunk):
         assert isinstance(chunk, CqlChunk)
+        if chunk.is_comment():
+            return NO_CHANGE
         if chunk.is_update():
             i = chunk.info
-            query = "SELECT %s from %s WHERE %s=%s" % (i.col, i.table, i.pkcol, i.pkvalue)
+            query = "SELECT %s from %s WHERE %s=%s;" % (i.col, i.table, i.pkcol, i.pkvalue)
             res = self.select(query)
             if len(res) > 0 and res[0][0] != None:
                 return NO_CHANGE
