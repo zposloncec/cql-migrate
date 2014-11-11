@@ -122,11 +122,15 @@ class DataNotOverwritten(TestCase):
         updated = [e.execute_chunk(c) for c in splitCql("UPDATE DataNotOverwritten.tt SET v = 4050 WHERE pk='bob';")]
         self.assertEquals(4050, e.select("SELECT v from DataNotOverwritten.tt WHERE pk='bob';")[0].v)
         self.assertEquals([RAN_OK], updated)
-        # If data already exists for that primary key, the data shouldn't be written
+        # If data already exists for that cell then it shouldn't be updated
         updated = [e.execute_chunk(c) for c in splitCql("UPDATE DataNotOverwritten.tt SET v = 4051 WHERE pk='bob';")]
         self.assertEquals(4050, e.select("SELECT v from DataNotOverwritten.tt WHERE pk='bob';")[0].v)
         self.assertEquals([NO_CHANGE], updated)
-
+        # In this case the primary key exists, but the cell is empty
+        e.execute_raw("INSERT INTO DataNotOverwritten.tt (pk) VALUES ('fred');")
+        updated = [e.execute_chunk(c) for c in splitCql("UPDATE DataNotOverwritten.tt SET v = 4052 WHERE pk='fred';")]
+        self.assertEquals(4052, e.select("SELECT v from DataNotOverwritten.tt WHERE pk='fred';")[0].v)
+        self.assertEquals([RAN_OK], updated)
 
 
 re_tab_nl = re.compile('[ \t]$', re.M)
