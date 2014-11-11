@@ -2,7 +2,6 @@
 
 from os import walk
 from os.path import join, dirname, normpath
-from time import sleep
 from unittest import TestCase, expectedFailure
 
 import re
