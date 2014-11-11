@@ -76,6 +76,12 @@ def updateParseAction(s, loc, tocs):
 
 update.setParseAction(updateParseAction)
 
+# INSERT
+insert = (CaselessLiteral("INSERT") + CaselessLiteral("INTO") + identifier + itemlist('(', identifier, ',', ')') +
+        CaselessLiteral("VALUES") + itemlist('(', literal, ',', ')') + ';')
+
+insert.setParseAction(ParseActionSimple('INSERT'))
+
 # CREATE KEYSPACE
 create_keyspace = (CaselessLiteral("CREATE") + CaselessLiteral("KEYSPACE") + ifnotexists + identifier
         + CaselessLiteral("WITH") + identifier + '=' + literal_map + ';')
@@ -92,7 +98,7 @@ comment = Regex('--[^\n]*') + lineEnd
 
 comment.setParseAction(ParseActionSimple('COMMENT'))
 
-cql = OneOrMore(ctable | alter | update | create_keyspace | comment)
+cql = OneOrMore(ctable | alter | update | insert | create_keyspace | comment)
 
 cql.enablePackrat()
 cql.parseWithTabs()

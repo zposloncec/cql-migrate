@@ -95,6 +95,10 @@ class SplitCQL(TestCase):
         splitCql("UPDATE x SET y={'a', 'b'} WHERE a=59514bf0-0830-11e4-9191-0800200c9a66;")
     def testParseMultpleAnd(self):
         splitCql("UPDATE x SET y='z' WHERE a='a' AND b='b';")
+    def testParseInsert(self):
+        """Note that inserts are dangerous: only use them when all the columns
+        are primary keys"""
+        splitCql("INSERT INTO foo.bar (col1, col2) VALUES ({'a'}, 45);")
 
 
 CASSANDRA_HOST = 'localhost'
