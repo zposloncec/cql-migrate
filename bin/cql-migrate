@@ -3,23 +3,23 @@
 from sys import stdin
 from argparse import ArgumentParser
 
-from cqlmigrate import splitCql, CqlshExecutor
+from cqlmigrate import splitCql, CassandraExecutor
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='Migrate CQL Schemas')
     parser.add_argument('-f', '--file', type=file, default=stdin)
     parser.add_argument('host', default='localhost', nargs='?')
-    parser.add_argument('port', default=9160, type=int, nargs='?')
+    parser.add_argument('port', default=9042, type=int, nargs='?')
     args = parser.parse_args()
     print "Deploying to %s:%s" % (args.host, args.port)
-    executor = CqlshExecutor(args.host, args.port)
+    executor = CassandraExecutor(args.host, args.port)
     cql = args.file.read()
     chunks = splitCql(cql)
     print "Found %d chunks of CQL" % len(chunks)
     for c in chunks:
         print "----------------------"
         print c.body()
-        a = executor.execute(c.body())
+        a = executor.execute_chunk(c)
         print "==> %d" % a
 
 # vim: set expandtab tabstop=4 shiftwidth=4:
