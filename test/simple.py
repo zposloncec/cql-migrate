@@ -168,5 +168,16 @@ class CodeStyle(TestCase):
         self._checkpythonfile(join(projroot,'bin'), 'cql-migrate')
 
 if __name__ == '__main__':
+    try:
+        with open('hosts.conf') as f:
+            content = f.read()
+            host = re.search('cassandra.contact-points.0.host="([0-9.]+)"', content)
+            CASSANDRA_HOST = host.group(1)
+            port = re.search('cassandra.contact-points.0.port=([0-9]+)', content)
+            CASSANDRA_PORT = int(port.group(1))
+            print "Will connect to cassandra on %s:%d" % (CASSANDRA_HOST, CASSANDRA_PORT)
+    except IOError:
+        print "hosts.conf not found"
+        pass
     unittest.main()
 # vim: set expandtab tabstop=4 shiftwidth=4:
