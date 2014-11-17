@@ -1,2 +1,12 @@
 *.pyc
 .*.swp
+/debian/files
+/debian/debhelper.log
+/debian/substvars
+/debian/cql-migrate
+/debian/cql-migrate.debhelper.log
+/debian/cql-migrate.postinst.debhelper
+/debian/cql-migrate.prerm.debhelper
+/debian/cql-migrate.substvars
+/build
+/.pybuild
