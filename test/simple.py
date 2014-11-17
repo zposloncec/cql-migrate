@@ -99,6 +99,12 @@ class SplitCQL(TestCase):
         """Note that inserts are dangerous: only use them when all the columns
         are primary keys"""
         splitCql("INSERT INTO foo.bar (col1, col2) VALUES ({'a'}, 45);")
+    def testParseSlashSlashComments(self):
+        splitCql("""
+        -- This is a comment
+        // As is this
+        UPDATE x SET y='z' WHERE a='//';
+        UPDATE x SET y='z' WHERE a='--';""")
 
 
 CASSANDRA_HOST = 'localhost'

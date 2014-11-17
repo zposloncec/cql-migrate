@@ -94,7 +94,7 @@ create_keyspace.setParseAction(ParseActionSimple('CREATE KEYSPACE'))
 # part of cqlsh. Instead mark them as special chunks and skip them in
 # the executor. This means that comments may only appear between
 # statements.
-comment = Regex('--[^\n]*') + lineEnd
+comment = Regex('(--|//)[^\n]*') + lineEnd
 
 comment.setParseAction(ParseActionSimple('COMMENT'))
 
