@@ -8,5 +8,6 @@
 /debian/cql-migrate.postinst.debhelper
 /debian/cql-migrate.prerm.debhelper
 /debian/cql-migrate.substvars
+/debian/cql-migrate.manpages
 /build
 /.pybuild
