@@ -1,0 +1,10 @@
+-- Danger! Changes to this schema definition need to be made carefully to
+-- ensure that automatic schema migrations will continue to work.
+--
+-- 1) Never add columns to an existing CREATE statement: write a separate ALTER
+--    TABLE statement instead.
+-- 2) Don't modify the primary keys of a table after it is created.
+-- 3) Create static data using UPDATE statements
+--
+-- deploy this file to Cassandra with
+-- # cql-migrate -f database.cql [host] [port]
