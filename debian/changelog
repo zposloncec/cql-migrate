@@ -1,3 +1,9 @@
+cql-migrate (0.2) unstable; urgency=medium
+
+  * Support // comments
+
+ -- Phil Wise <phil@advancedtelematic.com>  Mon, 17 Nov 2014 14:37:48 +0100
+
 cql-migrate (0.1) unstable; urgency=medium
 
   * Initial release.
