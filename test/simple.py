@@ -193,6 +193,7 @@ class CodeStyle(TestCase):
                     if name.endswith('.py'):
                         self._checkpythonfile(root, name)
         self._checkpythonfile(join(projroot,'bin'), 'cql-migrate')
+        self._checkpythonfile(projroot, 'setup.py')
 
 if __name__ == '__main__':
     try:
