@@ -1,0 +1,8 @@
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Files: *
+Copyright: Copyright 2014 ATS Advanced Telematic Systems GmbH
+License: Apache 2.0
+	This software is licensed under the Apache License 2.0. On Debian
+	GNU/Linux systems you can find the complete text of the Apache-2.0
+	license in `/usr/share/common-licenses/Apache-2.0'.
+
