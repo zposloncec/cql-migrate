@@ -1,0 +1,271 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+	<meta http-equiv="content-type" content="text/html; charset=utf-8">
+	<title></title>
+	<meta name="generator" content="LibreOffice 4.2.7.2 (Linux)">
+	<meta name="created" content="20141107;0">
+	<meta name="changed" content="20141118;114524885451471">
+	<style type="text/css">
+	<!--
+		@page { margin: 0.79in }
+		td p { margin-bottom: 0.1in; color: #000000; line-height: 120% }
+		h1 { margin-bottom: 0.08in; color: #000000 }
+		h1.western { font-family: "Liberation Sans", sans-serif; font-size: 18pt }
+		h1.cjk { font-family: "Droid Sans Fallback"; font-size: 18pt }
+		h1.ctl { font-family: "FreeSans"; font-size: 18pt }
+		p { margin-bottom: 0.1in; color: #000000; line-height: 120% }
+		h2 { color: #000000 }
+		h2.western { font-family: "Liberation Sans", sans-serif; font-size: 16pt }
+		h2.cjk { font-family: "Droid Sans Fallback"; font-size: 16pt }
+		h2.ctl { font-family: "FreeSans"; font-size: 16pt }
+		h3.cjk { font-family: "Droid Sans Fallback" }
+		h3.ctl { font-family: "FreeSans" }
+		h4.cjk { font-family: "Droid Sans Fallback" }
+		h4.ctl { font-family: "FreeSans" }
+		pre { color: #000000 }
+		pre.cjk { font-family: "Droid Sans Fallback", monospace }
+		a:link { so-language: zxx }
+	-->
+	</style>
+</head>
+<body lang="en-US" text="#000000" dir="ltr" style="background: transparent">
+<h1 class="western">Cassandra Schema Migration</h1>
+<h2 class="western">Problem Statement</h2>
+<p>An application using a Cassandra data store needs to be upgraded
+without downtime and will be deployed without an administrator to
+handle schema changes. There needs to be an automated way to deploy
+the initial schema and make the modifications that are required for
+an upgrade.</p>
+<h2 class="western">Example Cases</h2>
+<p>These modifications can be of several forms, for example:</p>
+<ol>
+	<li><p>Adding a new table</p>
+	<li><p>Added a new column to an existing table, for example a
+	'date_of_birth' column to a 'users' table.</p>
+	<li><p>Creating static data, for example the default admin username
+	and password.</p>
+</ol>
+<h2 class="western">Solutions</h2>
+<p>There are three high level approaches to handling schema migration
+in the relational database world. These are:</p>
+<ol>
+	<li><p>Upgrade steps. There is a list of upgrade steps that
+	transform the empty database into the desired schema. There is a
+	table of already applied steps and any missing upgrade steps are
+	applied. This is the approach used by Entity Framework Code First
+	Migrations from Microsoft and Active Record Migrations from Ruby on
+	Rails.</p>
+	<li><p>Dynamic comparison. The application knows what schema it
+	expects. It modifies the current schema to match its expectations.
+	This is the approach used by SQL Compare and Hibernate ORM's
+	SchemaUpdate tool.</p>
+	<li><p>Idempotent operations. The schema creation scripts are
+	written to be idempotent, and are run on every deployment.</p>
+</ol>
+<p>The actual process of applying the schema updates can either be
+performed by the application when it starts or during the deployment
+process.</p>
+<h2 class="western">Evaluation</h2>
+<h3 class="western">Option 1 – Upgrade steps</h3>
+<p>This would require a way to atomically apply one or more schema
+modifications and update a table in the database. Unfortunately this
+isn't possible with Cassandra. There is a 'BATCH' command that can be
+used to execute several DML (data) changes atomically, but this
+doesn't support DDL (schema) changes.</p>
+<p>A solution based on this approach is possible, but a partially
+applied schema update would be very hard to recover from. This would
+occur not only on a connection drop but also on concurrent
+modifications or schema update failures. 
+</p>
+<h3 class="western">Option 2 – Dynamic comparison</h3>
+<p>This approach would require a tool to compare two Cassandra schema
+and synchronize the differences. There doesn't appear to be a
+preexisting tool that can do this. It would be possible to write one.
+</p>
+<p>Writing a compare/sync tool could be simplified by only requiring
+it to handle a subset of the possible schema modifications, by only
+supporting adding non-primary key columns and creating tables, for
+example.</p>
+<p>This tool would take a set of schema creation scripts, parse them
+into an internal representation then compare this with the
+system.schema_columns and system.schema_columnfamilies tables of a
+live database. It would then apply a set of 'CREATE TABLE...' and
+'ALTER TABLE...' commands to bring the two into sync.</p>
+<p>The advantage of this approach over the next one is that the API
+presented to the rest of the system is a simple create script, at the
+expense of extra programming effort.</p>
+<h3 class="western">Option 3 – Idempotent operations</h3>
+<p>If we only allow schema modification scripts of the following
+forms, then their operations are atomic and can be made idempotent by
+catching and ignoring the relevant errors:</p>
+<ol>
+	<li><pre class="western">CREATE TABLE …..;</pre>
+	<li><pre class="western">ALTER TABLE add &lt;col&gt; &lt;type&gt;;</pre>
+	<li><pre class="western">UPDATE &lt;table&gt; SET &lt;col&gt; =
+	&lt;value&gt; WHERE &lt;pkey&gt; = &lt;value&gt;;</pre>
+</ol>
+<p>For the 3<sup>rd</sup> case, the system can trivially parse the
+CQL and check that the column is null before performing the
+operation.</p>
+<p>Rather than require the user to split their schema creation
+scripts into tiny files, we will split them into chunks in the schema
+migration tool.</p>
+<h3 class="western">Application Interface</h3>
+<p>Successful migrations with cql-migrate requires the application
+programmer to obey the following constraints:</p>
+<table width="100%" cellpadding="4" cellspacing="0">
+	<col width="128*">
+	<col width="128*">
+	<tr valign="top">
+		<td width="50%" style="border-top: 1px double #808080; border-bottom: 1px double #808080; border-left: 1px double #808080; border-right: none; padding-top: 0.04in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in">
+			<h4 class="western">New columns may be null</h4>
+		</td>
+		<td width="50%" style="border: 1px double #808080; padding: 0.04in">
+			<p>The application must handle null values in any column that was
+			added after the initial table creation. The application may assume
+			that columns created during the initial CREATE TABLE will be have
+			been populated as normal. For new columns the application should
+			map 'null' to whatever default value would have been chosen during
+			schema migration.</p>
+		</td>
+	</tr>
+	<tr valign="top">
+		<td width="50%" style="border-top: none; border-bottom: 1px double #808080; border-left: 1px double #808080; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in">
+			<h4 class="western">Schema changes don't break old apps</h4>
+		</td>
+		<td width="50%" style="border-top: none; border-bottom: 1px double #808080; border-left: 1px double #808080; border-right: 1px double #808080; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0.04in">
+			<p>When changing the schema, ensure that it doesn't break the
+			previous version of the application</p>
+		</td>
+	</tr>
+	<tr valign="top">
+		<td width="50%" style="border-top: none; border-bottom: 1px double #808080; border-left: 1px double #808080; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in">
+			<h4 class="western">Let old apps play</h4>
+		</td>
+		<td width="50%" style="border-top: none; border-bottom: 1px double #808080; border-left: 1px double #808080; border-right: 1px double #808080; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0.04in">
+			<p>During an upgrade this set of components must be able to work
+			together:</p>
+			<ul>
+				<li><p>Schema version n</p>
+				<li><p>Application version n</p>
+				<li><p>Application version n-1</p>
+			</ul>
+			<p>Note that writes created by version n may be (briefly) seen by
+			a version n-1 app. In the case of an aborted upgrade there may be
+			an extended period of version n-1 application operating on a
+			version n schema.</p>
+		</td>
+	</tr>
+	<tr valign="top">
+		<td width="50%" style="border-top: none; border-bottom: 1px double #808080; border-left: 1px double #808080; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in">
+			<h4 class="western">No changing Static data</h4>
+		</td>
+		<td width="50%" style="border-top: none; border-bottom: 1px double #808080; border-left: 1px double #808080; border-right: 1px double #808080; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0.04in">
+			<p>If the user modifies static or default data such as the default
+			administration account and password, then these changes must be
+			preserved on schema upgrade. In order to support this, static data
+			will only be added if current value is of the cell is null.</p>
+		</td>
+	</tr>
+</table>
+<h3 class="western">Implementation</h3>
+<p>The tool called 'cql-migrate' takes a  similar set of options to
+cqlsh:</p>
+<pre class="western">cql-migrate -f &lt;file.cql&gt; [host] [port]</pre>
+<p>The input schema is parsed into statements in order to positively
+identify the chunks that need to be applied atomically and to ensure
+that only the 'safe' subset of CQL is being used.</p>
+<p>Each of those chunks is then fired into the cassandra connection
+and the errors thrown away. For UPDATE chunks, a SELECT query is
+performed first to ensure that there isn't existing data present.</p>
+<p>This command should be run on a single node during deployment,
+after the Cassandra cluster has been initialized and before the
+application is started.</p>
+<h3 class="western">Examples</h3>
+<table width="100%" cellpadding="4" cellspacing="0">
+	<col width="128*">
+	<col width="128*">
+	<tr valign="top">
+		<td width="50%" style="border-top: 1px double #808080; border-bottom: 1px double #808080; border-left: 1px double #808080; border-right: none; padding-top: 0.04in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in">
+			<h3 class="western">Adding a table</h3>
+		</td>
+		<td width="50%" style="border: 1px double #808080; padding: 0.04in">
+			<p>Add the CREATE TABLE statement to the .cql script.</p>
+			<pre class="western">CREATE TABLE keyspace1.users (<br>  id uuid,
+			<br>  name text, <br>  PRIMARY KEY(id)<br>);</pre>
+		</td>
+	</tr>
+	<tr valign="top">
+		<td width="50%" style="border-top: none; border-bottom: 1px double #808080; border-left: 1px double #808080; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in">
+			<h3 class="western">use &lt;keyspace&gt;;</h3>
+		</td>
+		<td width="50%" style="border-top: none; border-bottom: 1px double #808080; border-left: 1px double #808080; border-right: 1px double #808080; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0.04in">
+			<p>The use statement isn't supported by cql-migrate. Include the
+			keyspace in the table names instead:</p>
+			<pre class="western">create table keyspace1.bob (...)</pre>
+		</td>
+	</tr>
+	<tr valign="top">
+		<td width="50%" style="border-top: none; border-bottom: 1px double #808080; border-left: 1px double #808080; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in">
+			<h3 class="western">Adding a (non-primary-key) column</h3>
+		</td>
+		<td width="50%" style="border-top: none; border-bottom: 1px double #808080; border-left: 1px double #808080; border-right: 1px double #808080; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0.04in">
+			<p>Don't modify an existing CREATE TABLE statement. Instead add an
+			ALTER TABLE statement after the existing CREATE statement. This
+			will also signal to the application programmers that the database
+			may contain old rows where this column has not been initialized:</p>
+			<pre class="western">CREATE TABLE keyspace1.users (</pre>
+			<pre class="western">  id uuid, 
+			</pre>
+			<pre class="western">  name text, 
+			</pre>
+			<pre class="western">  PRIMARY KEY(id)</pre>
+			<pre class="western">);</pre>
+			<pre class="western">ALTER TABLE keyspace1.users ADD dob text;</pre>
+		</td>
+	</tr>
+	<tr valign="top">
+		<td width="50%" style="border-top: none; border-bottom: 1px double #808080; border-left: 1px double #808080; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in">
+			<h3 class="western">Add a primary-key column</h3>
+		</td>
+		<td width="50%" style="border-top: none; border-bottom: 1px double #808080; border-left: 1px double #808080; border-right: 1px double #808080; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0.04in">
+			<p>This involves writing a data migration process, and isn't
+			supported by cql-migrate directly. Use cql-migrate to create a
+			table with a new name and new primary key, write a tool to
+			incrementally migrate the data over, and have the application
+			write to/read from both representations at once.</p>
+		</td>
+	</tr>
+	<tr valign="top">
+		<td width="50%" style="border-top: none; border-bottom: 1px double #808080; border-left: 1px double #808080; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in">
+			<h3 class="western">Creating static data</h3>
+		</td>
+		<td width="50%" style="border-top: none; border-bottom: 1px double #808080; border-left: 1px double #808080; border-right: 1px double #808080; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0.04in">
+			<p>Never use insert statements unless all the columns being
+			updated are part of the primary key. Use UPDATE statements
+			instead:</p>
+			<pre class="western">UPDATE phil.tok SET details='default user'
+			WHERE name='jack';</pre>
+			<p>(Note that UPDATE and INSERT statements share the same 'upsert'
+			semantics in Cassandra)</p>
+		</td>
+	</tr>
+</table>
+<p>The file 'schema-update-rules.txt' contains a short description of
+these rules in a format suitable for pasting into the top of the
+schema creation script of an application. It is available from the
+'docs' directory of the cql-migrate project, and is installed in
+/usr/share/doc/cql-migrate.</p>
+<h3 class="western">A note on version co-existence</h3>
+<p>Since it is not possible to atomically update the application code
+and the database schema, one of these two must be true:</p>
+<ol>
+	<li><p>The new schema is accepted by old applications</p>
+	<li><p>New applications are happy with the old schema, with reduced
+	functionality.</p>
+</ol>
+<p>Option #1 is simpler to implement, and doesn't require the
+application to be aware of version considerations.</p>
+</body>
+</html>

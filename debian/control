@@ -8,6 +8,7 @@ Standards-Version: 3.9.5
 
 Package: cql-migrate
 Architecture: all
-Depends: python, python-cassandra-driver, python-pyparsing
+Depends: python, python-cassandra-driver, python-pyparsing, ${misc:Depends}
 Description: Incremental schema migration/deployment for Cassandra CQL
-
+	Allows applications to automatically deploy incremental changes
+	to Cassandra CQL schemas.

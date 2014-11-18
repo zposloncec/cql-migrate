@@ -1,5 +1,17 @@
 #! /usr/bin/env python
 
+# Copyright 2014 ATS Advanced Telematic Systems GmbH
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
 from os import walk
 from os.path import join, dirname, normpath
 from unittest import TestCase, expectedFailure
@@ -171,6 +183,8 @@ class DataNotOverwritten(TestCase):
             e.execute_chunk(c)
 
 re_tab_nl = re.compile('[ \t]$', re.M)
+re_has_license = re.compile('Licensed under the Apache License, Version 2\.0')
+re_has_copyright = re.compile('Copyright 2014 ATS Advanced Telematic Systems GmbH')
 
 class CodeStyle(TestCase):
     """Check some code style issues, specifically trailing whilespace and
@@ -185,6 +199,8 @@ class CodeStyle(TestCase):
                 if m:
                     lineno = len(contents[:m.start()].splitlines())
                     self.fail(path + " contains trailing whitespace on line %d" % lineno)
+                self.assertIsNotNone(re_has_license.search(contents), path + " is missing the apache license")
+                self.assertIsNotNone(re_has_copyright.search(contents), path + " is missing a copyright statement")
     def testNoTabs(self):
         projroot = normpath(join(dirname(__file__), '..'))
         for d in ['cqlmigrate', 'test']:
@@ -193,6 +209,7 @@ class CodeStyle(TestCase):
                     if name.endswith('.py'):
                         self._checkpythonfile(root, name)
         self._checkpythonfile(join(projroot,'bin'), 'cql-migrate')
+        self._checkpythonfile(projroot, 'setup.py')
 
 if __name__ == '__main__':
     try:
