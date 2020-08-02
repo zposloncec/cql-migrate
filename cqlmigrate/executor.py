@@ -16,6 +16,7 @@ import subprocess
 # Library imports
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra import AlreadyExists, InvalidRequest
+from cassandra.auth import PlainTextAuthProvider
 
 # Application imports
 from .split import CqlChunk, splitCql
@@ -38,9 +39,11 @@ class CqlExecutionFailed(Exception):
 
 class CassandraExecutor(object):
     """Execute CQL by calling the python-cassandra library"""
-    def __init__(self, host, port):
-        cluster = Cluster([host], port)
+    def __init__(self, host, port, username, password,keyspace):
+        auth_provider = PlainTextAuthProvider(username=username,password=password)
+        cluster = Cluster([host], port, auth_provider=auth_provider)
         self.session = cluster.connect()
+        self.session.set_keyspace(keyspace)
     def execute_chunk(self, chunk):
         assert isinstance(chunk, CqlChunk)
         if chunk.is_comment():
