@@ -23,8 +23,7 @@ For example, v1 of an application has a database creation script like:
 
 Which can be deployed to a local cassandra instance using:
 
-	cql-migrate -f database.cql
-
+	cql-migrate -f database.cql -u username -p password
 We never have to remember if the script has been run already: it is always safe
 to rerun it with `cql-migrate`.
 
@@ -44,7 +43,7 @@ We decide that we need a new column to store the user's date of birth. Add a
 These changes can be simply deployed by rerunning the whole script through
 `cql-migrate`:
 
-	cql-migrate -f database.cql
+	cql-migrate -f database.cql -u username -p password -k keyspace
 
 This will create the entire schema if run against a blank database, or just add
 the 'dob' column to an existing database.

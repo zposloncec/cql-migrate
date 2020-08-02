@@ -40,11 +40,6 @@ class CqlExecutionFailed(Exception):
 class CassandraExecutor(object):
     """Execute CQL by calling the python-cassandra library"""
     def __init__(self, host, port, username, password,keyspace):
-        print(host)
-        print(port)
-        print(username)
-        print(password)
-        print(keyspace)
         auth_provider = PlainTextAuthProvider(username=username,password=password)
         cluster = Cluster([host], port, auth_provider=auth_provider)
         self.session = cluster.connect()
